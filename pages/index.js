@@ -1,28 +1,19 @@
+// pages/index.js - Updated to work with authentication
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [code, setCode] = useState('');
   const [deployStatus, setDeployStatus] = useState('idle'); // idle, deploying, success, error
   const [liveUrl, setLiveUrl] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [detectedLanguage, setDetectedLanguage] = useState('');
-  const [deployHistory, setDeployHistory] = useState([]);
   const [editorFocused, setEditorFocused] = useState(false);
-
-  // Load deployment history from localStorage on initial load
-  useEffect(() => {
-    const savedHistory = localStorage.getItem('deployHistory');
-    if (savedHistory) {
-      try {
-        setDeployHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error('Failed to parse deployment history');
-      }
-    }
-  }, []);
 
   // Function to detect language as user types
   const detectLanguage = (codeText) => {
@@ -83,25 +74,8 @@ export default function Home() {
       }
 
       setLiveUrl(data.liveUrl);
-      const finalLanguage = data.language || detectedLanguage;
-      setDetectedLanguage(finalLanguage);
+      setDetectedLanguage(data.language || detectedLanguage);
       setDeployStatus('success');
-      
-      // Add to deployment history
-      const newDeployment = {
-        id: Math.random().toString(36).substring(2, 9),
-        url: data.liveUrl,
-        language: finalLanguage,
-        timestamp: new Date().toISOString(),
-        codeSnippet: code.slice(0, 100) + (code.length > 100 ? '...' : '')
-      };
-      
-      const updatedHistory = [newDeployment, ...deployHistory.slice(0, 4)];
-      setDeployHistory(updatedHistory);
-      
-      // Save to localStorage
-      localStorage.setItem('deployHistory', JSON.stringify(updatedHistory));
-      
     } catch (error) {
       setErrorMessage(error.message || 'Deployment failed');
       setDeployStatus('error');
@@ -217,172 +191,262 @@ if __name__ == '__main__':
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="min-h-screen bg-gray-50">
       <Head>
-        <title>Simple Code Deployment</title>
+        <title>Code Deployment Platform</title>
         <meta name="description" content="Deploy your code with a single click" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main>
-        <h1 className="text-3xl font-bold mb-4 text-center">Code Deployment Platform</h1>
-        <p className="text-center mb-8 text-gray-600">Write code, click deploy, get a live URL</p>
-        
-        <div className="mb-2 flex flex-wrap gap-2">
-          <button
-            onClick={() => loadExample('JavaScript')}
-            className="px-3 py-1 text-sm bg-yellow-200 hover:bg-yellow-300 rounded"
-          >
-            Load JS Example
-          </button>
-          <button
-            onClick={() => loadExample('Python')}
-            className="px-3 py-1 text-sm bg-blue-200 hover:bg-blue-300 rounded"
-          >
-            Load Python Example
-          </button>
-          <button
-            onClick={() => loadExample('Node API')}
-            className="px-3 py-1 text-sm bg-green-200 hover:bg-green-300 rounded"
-          >
-            Node.js API
-          </button>
-          <button
-            onClick={() => loadExample('Python Data')}
-            className="px-3 py-1 text-sm bg-purple-200 hover:bg-purple-300 rounded"
-          >
-            Python Data Analysis
-          </button>
-        </div>
-        
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <label htmlFor="code" className="font-medium">
-              Your Code ({detectedLanguage || 'Python or JavaScript'})
-            </label>
-            {detectedLanguage && (
-              <span className={`px-2 py-1 text-xs rounded ${
-                detectedLanguage === 'JavaScript' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-              }`}>
-                {detectedLanguage} Detected
-              </span>
-            )}
-          </div>
-          
-          <div className="relative border border-gray-300 rounded-md overflow-hidden">
-            {!editorFocused && (
-              <div className="absolute right-2 top-2 z-10 text-xs text-gray-500">
-                Tip: Press Tab for indentation
+      <nav className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <Link href="/">
+                  <a className="text-xl font-bold text-blue-600">CodeDeploy</a>
+                </Link>
               </div>
-            )}
-            
-            {/* Editor with syntax highlighting */}
-            <div className="relative">
-              <textarea
-                id="code"
-                className="w-full h-80 p-4 font-mono text-sm bg-transparent absolute top-0 left-0 z-10 text-transparent caret-gray-900 resize-none"
-                value={code}
-                onChange={handleCodeChange}
-                onFocus={() => setEditorFocused(true)}
-                onBlur={() => setEditorFocused(false)}
-                spellCheck="false"
-                placeholder="// Enter your code here..."
-                style={{ caretColor: '#333' }}
-              />
-              <div className="w-full h-80 overflow-auto">
-                <SyntaxHighlighter
-                  language={detectedLanguage?.toLowerCase() || 'javascript'}
-                  style={vscDarkPlus}
-                  wrapLines={true}
-                  className="h-full"
-                >
-                  {code || '// Enter your code here...'}
-                </SyntaxHighlighter>
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                <Link href="/">
+                  <a className="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    Home
+                  </a>
+                </Link>
+                {session && (
+                  <Link href="/dashboard">
+                    <a className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                      Dashboard
+                    </a>
+                  </Link>
+                )}
               </div>
+            </div>
+            <div className="hidden sm:ml-6 sm:flex sm:items-center">
+              {status === 'loading' ? (
+                <div className="h-4 w-4 rounded-full border-t-2 border-b-2 border-blue-500 animate-spin"></div>
+              ) : session ? (
+                <div className="flex items-center">
+                  <span className="text-sm font-medium text-gray-700 mr-2">
+                    {session.user.name || session.user.email}
+                  </span>
+                  <Link href="/dashboard">
+                    <a className="text-sm mr-4 text-blue-600 hover:text-blue-500">
+                      Dashboard
+                    </a>
+                  </Link>
+                  <Link href="/api/auth/signout">
+                    <a className="text-sm text-gray-500 hover:text-gray-700">
+                      Sign out
+                    </a>
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <Link href="/auth/signin">
+                    <a className="text-sm font-medium text-blue-600 hover:text-blue-500 mr-4">
+                      Sign in
+                    </a>
+                  </Link>
+                  <Link href="/auth/signup">
+                    <a className="text-sm font-medium text-gray-500 hover:text-gray-700">
+                      Sign up
+                    </a>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
+      </nav>
 
-        <button
-          onClick={handleDeploy}
-          disabled={deployStatus === 'deploying'}
-          className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
-            deployStatus === 'deploying'
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
-          }`}
-        >
-          {deployStatus === 'deploying' ? (
-            <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Deploying...
-            </span>
-          ) : 'Deploy Code'}
-        </button>
-
-        {deployStatus === 'error' && (
-          <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
-            <p>{errorMessage}</p>
+      <div className="py-10">
+        <header>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 className="text-3xl font-bold text-gray-900">Code Deployment Platform</h1>
+            <p className="mt-2 text-gray-600">Write code, click deploy, get a live URL</p>
           </div>
-        )}
-
-        {deployStatus === 'success' && (
-          <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md">
-            <p className="font-medium mb-2">🎉 Deployment successful!</p>
-            <p className="mb-1">
-              Language: <span className="font-medium">{detectedLanguage}</span>
-            </p>
-            <p>
-              Your app is live at:{' '}
-              <a
-                href={liveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline font-medium"
-              >
-                {liveUrl}
-              </a>
-            </p>
-          </div>
-        )}
+        </header>
         
-        {/* Deployment History */}
-        {deployHistory.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">Recent Deployments</h2>
-            <div className="space-y-3">
-              {deployHistory.map((deployment) => (
-                <div key={deployment.id} className="p-3 border rounded-md bg-gray-50 hover:bg-gray-100">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-blue-600">
-                        <a href={deployment.url} target="_blank" rel="noopener noreferrer">
-                          {deployment.url}
-                        </a>
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">{deployment.codeSnippet}</p>
-                    </div>
+        <main className="mt-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+              <div className="mb-2 flex flex-wrap gap-2">
+                <button
+                  onClick={() => loadExample('JavaScript')}
+                  className="px-3 py-1 text-sm bg-yellow-200 hover:bg-yellow-300 rounded"
+                >
+                  Load JS Example
+                </button>
+                <button
+                  onClick={() => loadExample('Python')}
+                  className="px-3 py-1 text-sm bg-blue-200 hover:bg-blue-300 rounded"
+                >
+                  Load Python Example
+                </button>
+                <button
+                  onClick={() => loadExample('Node API')}
+                  className="px-3 py-1 text-sm bg-green-200 hover:bg-green-300 rounded"
+                >
+                  Node.js API
+                </button>
+                <button
+                  onClick={() => loadExample('Python Data')}
+                  className="px-3 py-1 text-sm bg-purple-200 hover:bg-purple-300 rounded"
+                >
+                  Python Data Analysis
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <label htmlFor="code" className="font-medium">
+                    Your Code ({detectedLanguage || 'Python or JavaScript'})
+                  </label>
+                  {detectedLanguage && (
                     <span className={`px-2 py-1 text-xs rounded ${
-                      deployment.language === 'JavaScript' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                      detectedLanguage === 'JavaScript' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
                     }`}>
-                      {deployment.language}
+                      {detectedLanguage} Detected
                     </span>
+                  )}
+                </div>
+                
+                <div className="relative border border-gray-300 rounded-md overflow-hidden">
+                  {!editorFocused && (
+                    <div className="absolute right-2 top-2 z-10 text-xs text-gray-500">
+                      Tip: Press Tab for indentation
+                    </div>
+                  )}
+                  
+                  {/* Editor with syntax highlighting */}
+                  <div className="relative">
+                    <textarea
+                      id="code"
+                      className="w-full h-80 p-4 font-mono text-sm bg-transparent absolute top-0 left-0 z-10 text-transparent caret-gray-900 resize-none"
+                      value={code}
+                      onChange={handleCodeChange}
+                      onFocus={() => setEditorFocused(true)}
+                      onBlur={() => setEditorFocused(false)}
+                      spellCheck="false"
+                      placeholder="// Enter your code here..."
+                      style={{ caretColor: '#333' }}
+                    />
+                    <div className="w-full h-80 overflow-auto">
+                      <SyntaxHighlighter
+                        language={detectedLanguage?.toLowerCase() || 'javascript'}
+                        style={vscDarkPlus}
+                        wrapLines={true}
+                        className="h-full"
+                      >
+                        {code || '// Enter your code here...'}
+                      </SyntaxHighlighter>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {new Date(deployment.timestamp).toLocaleString()}
+                </div>
+              </div>
+
+              <button
+                onClick={handleDeploy}
+                disabled={deployStatus === 'deploying'}
+                className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
+                  deployStatus === 'deploying'
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {deployStatus === 'deploying' ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Deploying...
+                  </span>
+                ) : 'Deploy Code'}
+              </button>
+
+              {deployStatus === 'error' && (
+                <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
+                  <p>{errorMessage}</p>
+                  {!session && errorMessage.includes('Authentication') && (
+                    <p className="mt-2">
+                      Please{' '}
+                      <Link href="/auth/signin">
+                        <a className="text-blue-600 underline">sign in</a>
+                      </Link>{' '}
+                      or{' '}
+                      <Link href="/auth/signup">
+                        <a className="text-blue-600 underline">sign up</a>
+                      </Link>{' '}
+                      to deploy code.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {deployStatus === 'success' && (
+                <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md">
+                  <p className="font-medium mb-2">🎉 Deployment successful!</p>
+                  <p className="mb-1">
+                    Language: <span className="font-medium">{detectedLanguage}</span>
+                  </p>
+                  <p>
+                    Your app is live at:{' '}
+                    <a
+                      href={liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      {liveUrl}
+                    </a>
+                  </p>
+                  {session && (
+                    <p className="mt-2">
+                      View all your deployments on your{' '}
+                      <Link href="/dashboard">
+                        <a className="text-blue-600 underline">dashboard</a>
+                      </Link>.
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {!session && deployStatus !== 'error' && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
+                  <p>
+                    <span className="font-medium">Pro tip:</span>{' '}
+                    <Link href="/auth/signup">
+                      <a className="text-blue-600 underline">Sign up</a>
+                    </Link>{' '}
+                    or{' '}
+                    <Link href="/auth/signin">
+                      <a className="text-blue-600 underline">sign in</a>
+                    </Link>{' '}
+                    to track all your deployments and manage them from your dashboard.
                   </p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
-        )}
-      </main>
+        </main>
+      </div>
       
-      <footer className="mt-8 pt-4 border-t border-gray-200 text-center text-gray-500 text-sm">
-        <p>Simple Code Deployment Platform</p>
+      <footer className="bg-white border-t border-gray-200 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center text-sm text-gray-500">
+            <p className="mb-2">Code Deployment Platform</p>
+            <div className="flex justify-center space-x-4">
+              <Link href="/docs">
+                <a className="text-blue-500 hover:underline">API Documentation</a>
+              </Link>
+              <a href="https://github.com/yourusername/code-deployer" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                GitHub Repository
+              </a>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );
